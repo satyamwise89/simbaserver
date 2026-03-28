@@ -4,8 +4,9 @@ const path = require("path");
 const cors = require("cors");
 
 const app = express();
-const rootDir = __dirname;
-const privateDir = path.join(rootDir, ".private");
+const serverDir = __dirname;
+const siteDir = path.resolve(__dirname, "..");
+const privateDir = path.join(serverDir, ".private");
 const configPath = path.join(privateDir, "telegram-config.json");
 const rateLimitPath = path.join(privateDir, "contact-rate-limit.json");
 const chatStorePath = path.join(privateDir, "chat-data.json");
@@ -128,7 +129,7 @@ function writeChatStore(data) {
 }
 
 function createChatSessionId() {
-    return `RS-${Math.random().toString(36).slice(2, 6).toUpperCase()}${Date.now().toString().slice(-4)}`;
+    return `SM-${Math.random().toString(36).slice(2, 6).toUpperCase()}${Date.now().toString().slice(-4)}`;
 }
 
 function formatChatMessages(messages = []) {
@@ -213,10 +214,10 @@ function createTelegramMessage({ name, email, phone, productInterest, message, p
     const safeEmail = escapeHtml(email);
     const safePhone = escapeHtml(phone || "Not provided");
     const safeInterest = escapeHtml(productInterest || "General enquiry");
-    const priorityTag = safeInterest.toLowerCase().includes("wheat") ? "HIGH PRIORITY" : "NEW LEAD";
+    const priorityTag = safeInterest.toLowerCase().includes("bulk") ? "HIGH PRIORITY" : "NEW LEAD";
 
     return [
-        "<b>RAHA SEEDS | NEW INQUIRY</b>",
+        "<b>SIMBA AGRO CHEMICALS | NEW INQUIRY</b>",
         "",
         `<b>PRIORITY</b>  <code>${priorityTag}</code>`,
         `<b>PRODUCT</b>  <code>${safeInterest}</code>`,
@@ -239,7 +240,7 @@ function createTelegramMessage({ name, email, phone, productInterest, message, p
         `- <b>Device</b>  ${escapeHtml(userAgent || "Unavailable")}`,
         "",
         "------------------------------",
-        "<i>Sent from Raha Seeds website contact form</i>"
+        "<i>Sent from Simba Agro Chemicals website contact form</i>"
     ].join("\n");
 }
 
@@ -293,7 +294,7 @@ async function sendSupportNotification(sessionId, pageContext, text) {
     const safePage = escapeHtml(pageContext || "Website chat");
     const safeText = escapeHtml(text).replace(/\n/g, "<br>");
     await sendToAuthorizedAdmins([
-        "<b>RAHA SEEDS | LIVE CHAT</b>",
+        "<b>SIMBA AGRO CHEMICALS | LIVE CHAT</b>",
         "",
         `<b>SESSION</b>  <code>${sessionId}</code>`,
         `<b>PAGE</b>  ${safePage}`,
@@ -374,7 +375,7 @@ async function processTelegramUpdates() {
             if (store.telegram.pendingAuth[chatId] && text === getAdminPassword()) {
                 store.telegram.authorizedChatIds.push(chatId);
                 store.telegram.pendingAuth[chatId] = false;
-                await sendTelegramMessageTo(chatId, "Admin access granted. Ab aapko website inquiries aur chat requests milengi.");
+                await sendTelegramMessageTo(chatId, "Admin access granted. Ab aapko Simba website inquiries aur live chat requests milengi.");
             } else if (store.telegram.pendingAuth[chatId]) {
                 await sendTelegramMessageTo(chatId, "Password incorrect hai. Dubara sahi password bhejiye.");
             }
@@ -518,7 +519,7 @@ app.post("/api/contact/submit", async (req, res) => {
 
     return res.json({
         ok: true,
-        message: "Thank you. Your enquiry has been sent to the Raha Seeds team."
+        message: "Thank you. Your enquiry has been sent to the Simba Agro Chemicals team."
     });
 });
 
@@ -583,18 +584,49 @@ app.post("/api/chat/message", async (req, res) => {
 });
 
 if (process.env.SERVE_STATIC === "true") {
-    app.use(express.static(rootDir, {
+    app.use(express.static(siteDir, {
         extensions: ["html"]
     }));
 
     app.get("/", (req, res) => {
-        res.sendFile(path.join(rootDir, "index.html"));
+        res.sendFile(path.join(siteDir, "index.html"));
     });
+}
+
+app.get("/api/health", (req, res) => {
+    res.json({
+        ok: true,
+        service: "simba-server"
+    });
+});
+
+function schedulePeerPing({ url, initialDelayMs, intervalMs }) {
+    const sendPing = async () => {
+        try {
+            const response = await fetch(url, { method: "GET", cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Ping failed with status ${response.status}`);
+            }
+        } catch {
+            // Silent fail to avoid noisy logs in production.
+        }
+    };
+
+    setTimeout(() => {
+        sendPing();
+        setInterval(sendPing, intervalMs);
+    }, initialDelayMs);
 }
 
 const port = Number(process.env.PORT || 3000);
 app.listen(port, () => {
-    console.log(`Raha Seeds server running on http://127.0.0.1:${port}`);
+    console.log(`Simba server running on http://127.0.0.1:${port}`);
+});
+
+schedulePeerPing({
+    url: "https://rahaseedserver.onrender.com/api/health",
+    initialDelayMs: 60 * 1000,
+    intervalMs: 3 * 60 * 1000
 });
 
 setInterval(() => {
